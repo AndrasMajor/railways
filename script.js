@@ -175,6 +175,102 @@ function simplifyMap(selectedMap) {
     return simplifiedMap;
 }
 
+//converts the simplified map into an adjecency matrix
+function toAdjacencyMatrix(grid) {
+    const rows = grid.length;
+    const cols = grid[0].length;
+    const size = rows * cols;
+    const adjMatrix = Array.from({ length: size }, () => Array(size).fill(0));
+
+    // Segédfüggvény a mátrix indexek 1D-re alakításához
+    function toIndex(row, col) {
+        return row * cols + col;
+    }
+
+    // Végigmegyünk az eredeti mátrixon
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            const cell = grid[r][c];
+            const currentIndex = toIndex(r, c);
+
+            if (cell === CellType.E || cell === CellType.O || cell === CellType.NR) continue;
+
+            // UL: "upleft"
+            if (cell === CellType.UL) {
+                if (r > 0) adjMatrix[currentIndex][toIndex(r - 1, c)] = 1; // Fel
+                if (c > 0) adjMatrix[currentIndex][toIndex(r, c - 1)] = 1; // Balra
+            }
+            // UR: "upright"
+            else if (cell === CellType.UR) {
+                if (r > 0) adjMatrix[currentIndex][toIndex(r - 1, c)] = 1; // Fel
+                if (c < cols - 1) adjMatrix[currentIndex][toIndex(r, c + 1)] = 1; // Jobbra
+            }
+            // DL: "downleft"
+            else if (cell === CellType.DL) {
+                if (r < rows - 1) adjMatrix[currentIndex][toIndex(r + 1, c)] = 1; // Le
+                if (c > 0) adjMatrix[currentIndex][toIndex(r, c - 1)] = 1; // Balra
+            }
+            // DR: "downright"
+            else if (cell === CellType.DR) {
+                if (r < rows - 1) adjMatrix[currentIndex][toIndex(r + 1, c)] = 1; // Le
+                if (c < cols - 1) adjMatrix[currentIndex][toIndex(r, c + 1)] = 1; // Jobbra
+            }
+            // V: "vertical"
+            else if (cell === CellType.V) {
+                if (r > 0) adjMatrix[currentIndex][toIndex(r - 1, c)] = 1; // Fel
+                if (r < rows - 1) adjMatrix[currentIndex][toIndex(r + 1, c)] = 1; // Le
+            }
+            // H: "horizontal"
+            else if (cell === CellType.H) {
+                if (c > 0) adjMatrix[currentIndex][toIndex(r, c - 1)] = 1; // Balra
+                if (c < cols - 1) adjMatrix[currentIndex][toIndex(r, c + 1)] = 1; // Jobbra
+            }
+        }
+    }
+
+    return adjMatrix;
+}
+
+//this function ensures, that there is only one circle on the map
+function onlyOneCircle(){
+    let adjMatrix = toAdjacencyMatrix(simplifiedMap);
+    const n = adjMatrix.length; // A szomszédsági mátrix mérete
+    const visited = new Array(n).fill(false); // Látogatottság nyomon követése
+    let cycleCount = 0; // Körök számlálása
+
+    // Mélységi keresés (DFS)
+    function dfs(node, parent) {
+        visited[node] = true;
+
+        for (let neighbor = 0; neighbor < n; neighbor++) {
+            if (adjMatrix[node][neighbor] === 1) { // Van él
+                if (!visited[neighbor]) {
+                    // Ha még nem látogattuk, rekurzívan folytatjuk a keresést
+                    if (dfs(neighbor, node)) {
+                        return true;
+                    }
+                } else if (neighbor !== parent) {
+                    // Ha a szomszéd már látogatott, és nem a szülő, akkor kört találtunk
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    // Minden komponens ellenőrzése
+    for (let i = 0; i < n; i++) {
+        if (!visited[i]) {
+            if (dfs(i, -1)) {
+                cycleCount++;
+            }
+        }
+    }
+
+    // Pontosan egy kört kell találni
+    return cycleCount === 1;
+}
+
 // this is the primary checkwin function, which is constantly check for a possible win
 function checkWinFc() {
     const simplifiedMap = simplifyMap(selectedMap);
@@ -205,7 +301,7 @@ function checkWinFc() {
         }
     }
 
-    if (win)
+    if (win && onlyOneCircle())
     {
         stopTimer();
         const newScore = saveScore(player, elapsedSeconds);
